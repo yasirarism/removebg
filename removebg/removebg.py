@@ -31,7 +31,6 @@ class ResultModel:
         self.height   = height
         self.foreground_type=foreground_type
         self.json = {'url':url,'filename':filename, 'width':width, 'height':height, 'foreground_type':foreground_type, **kwargs}
-        pass
     def __str__(self) -> str:
         return self.filename
     def __repr__(self) -> str:
@@ -86,14 +85,19 @@ class RemoveBg(Session):
         Image.open(image).save(res, format='png')
         return (filename, res.getvalue())
 
-    def get_token(self, token_retrying: int=1)->Union[None, str]:
+    def get_token(self, token_retrying: int=1) -> Union[None, str]:
         '''
         :param token_retrying: force get trust token
         '''
-        not 'x-csrf-token' in self.headers.keys() and self.headers.update({'x-csrf-token':self.post('https://www.remove.bg/trust_tokens').json()['csrf_token']})
+        'x-csrf-token' not in self.headers.keys() and self.headers.update(
+            {
+                'x-csrf-token': self.post(
+                    'https://www.remove.bg/trust_tokens'
+                ).json()['csrf_token']
+            }
+        )
         n=self.post('https://www.remove.bg/trust_tokens').text
-        x=re.search('useToken\(\'(.*?)\'',n)
-        if x:
+        if x := re.search('useToken\(\'(.*?)\'', n):
             return x.group(1)
 
     @property
@@ -133,7 +137,7 @@ class RemoveBg(Session):
         except KeyError:
             raise APIError(base['result']['error_message'])
 
-    def upload(self, img:Union[str, BytesIO], filename='nobg.png',trust_token_retrying:int=1,download_retrying=12, retryng_upload=5)->ResultModel:
+    def upload(self, img:Union[str, BytesIO], filename='nobg.png',trust_token_retrying:int=1,download_retrying=12, retryng_upload=5) -> ResultModel:
         '''
         :param img: image path/Bytes object of image
         :param filename: alias image name
@@ -154,8 +158,17 @@ class RemoveBg(Session):
             try:
                 stderr.write(f'Retrying Upload [{i+1}]\n')
                 stderr.flush()
-                up = self.post('https://www.remove.bg/images', data={'trust_token':self.get_token(token_retrying=trust_token_retrying)}, files={'image[original]':self.filename_object_png(img, filename)}).json()
-                if up:
+                if up := self.post(
+                    'https://www.remove.bg/images',
+                    data={
+                        'trust_token': self.get_token(
+                            token_retrying=trust_token_retrying
+                        )
+                    },
+                    files={
+                        'image[original]': self.filename_object_png(img, filename)
+                    },
+                ).json():
                     return self.download(up,download_retrying)
             except requests.exceptions.SSLError:
                 stderr.write('[SSL ERROR]\n')
